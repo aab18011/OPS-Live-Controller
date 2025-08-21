@@ -6,7 +6,7 @@
 
 ## Overview
 
-The **Remote OBS Controller (ROC)**, also known as the Outback Paintball Series Live Stream Controller (OPSLC/ROC), is a sophisticated automation system designed to manage scene transitions in Open Broadcaster Software (OBS) for live sports events, specifically optimized for paintball tournament livestreaming. Deployed as a systemd service within a Linux LXC container, ROC enables autonomous camera switching based on real-time scoreboard data, allowing operators to focus on commentary and field camera operations.
+The **Remote OBS Controller (ROC)**, also known as the OPS Live Stream Controller (OPSLC/ROC), is a sophisticated automation system designed to manage scene transitions in Open Broadcaster Software (OBS) for live sports events, specifically optimized for paintball tournament livestreaming. Deployed as a systemd service within a Linux LXC container, ROC enables autonomous camera switching based on real-time scoreboard data, allowing operators to focus on commentary and field camera operations.
 
 The system integrates web scraping, real-time data parsing, and WebSocket communication to facilitate dynamic scene transitions aligned with game states (intermission, break, game). Built with Python 3 and leveraging `asyncio` for non-blocking operations, ROC ensures ultra-fast, low-latency performance critical for live environments. Version 2.5.0b includes robust features like persistent browser sessions, intelligent game state detection, and enhanced OBS connectivity, with support for mid-match startup scenarios (e.g., post-power surge).
 
@@ -242,5 +242,4 @@ This project is licensed under the Affero-Gnu Public License v3.0 (AGPLv3). See 
 ## Acknowledgments
 
 - Author: Aidan A. Bradley
-- Thomas Brierton (support and feedback)
-- Built for the Outback Paintball Series to enhance live streaming automation.
+- Built for the OPS to enhance live streaming automation.
