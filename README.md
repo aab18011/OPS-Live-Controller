@@ -1,70 +1,246 @@
-# Outback Paintball Series Live Stream Controller (OPSLC/ROC)
-## Introduction
+# Remote OBS Controller (ROC)
 
-The Remote OBS Controller (ROC) script represents a sophisticated automation system designed for managing Open Broadcaster Software (OBS) scenes in the context of live sports scoreboard monitoring. Developed for deployment in a Linux LXC container with systemd service management, the script integrates web scraping, real-time data parsing, and WebSocket communication to facilitate dynamic camera switching based on game states derived from a remote scoreboard. This version (v2.1.2) incorporates fixes for breakout sequence duration, pause detection, task cancellation, and OBS keep-alive mechanisms, ensuring robustness in high-latency or paused scenarios.
+![License](https://img.shields.io/badge/license-AGPLv3-blue.svg)
+![Python](https://img.shields.io/badge/python-3.8+-blue.svg)
+![Version](https://img.shields.io/badge/version-2.5.0b-green.svg)
 
-The script is implemented in Python 3, leveraging asynchronous programming via the `asyncio` library to handle non-blocking operations, which is crucial for ultra-fast polling and scene transitions. It employs a modular class-based architecture, with the `ROCController` class encapsulating all core functionality. Key libraries are chosen for their specialized capabilities: Selenium for persistent browser sessions and DOM parsing, BeautifulSoup for HTML extraction, WebSockets for OBS control, and Pandas for bracket file processing. These choices reflect a balance between performance, reliability, and ease of integration in a constrained environment.
+## Overview
 
-## Imports and Dependencies
+The **Remote OBS Controller (ROC)**, also known as the Outback Paintball Series Live Stream Controller (OPSLC/ROC), is a sophisticated automation system designed to manage scene transitions in Open Broadcaster Software (OBS) for live sports events, specifically optimized for paintball tournament livestreaming. Deployed as a systemd service within a Linux LXC container, ROC enables autonomous camera switching based on real-time scoreboard data, allowing operators to focus on commentary and field camera operations.
 
-The script begins with a comprehensive set of imports, each selected for specific roles in the system's operation:
+The system integrates web scraping, real-time data parsing, and WebSocket communication to facilitate dynamic scene transitions aligned with game states (intermission, break, game). Built with Python 3 and leveraging `asyncio` for non-blocking operations, ROC ensures ultra-fast, low-latency performance critical for live environments. Version 2.5.0b includes robust features like persistent browser sessions, intelligent game state detection, and enhanced OBS connectivity, with support for mid-match startup scenarios (e.g., post-power surge).
 
-- **Standard Libraries**: Modules like `os`, `json`, `subprocess`, `logging`, `time`, `asyncio`, `hashlib`, `base64`, `socket`, `venv`, `signal`, and `sys` provide foundational utilities. For instance, `asyncio` is chosen for its native support of asynchronous I/O, enabling concurrent tasks without threading overhead. `logging` facilitates structured output for debugging and monitoring, configured to suppress verbose logs from third-party libraries to maintain focus on application-level events.
-  
-- **Third-Party Libraries**:
-  - `pkg_resources`: Used indirectly for dependency management, though not explicitly in code; it supports virtual environment handling.
-  - `pandas as pd`: Employed for reading ODS bracket files via `pd.read_excel(engine='odf')`. Pandas is selected for its powerful data manipulation capabilities, particularly with spreadsheet formats, allowing efficient parsing of tournament brackets into structured match data.
-  - `selenium.webdriver` and related modules: Selenium is chosen for its robust browser automation, enabling headless Chrome sessions to load and parse dynamic scoreboard pages. Alternatives like Requests were insufficient due to the need for JavaScript execution and persistent sessions. Options such as `--headless` and `--no-sandbox` optimize for containerized environments.
-  - `bs4.BeautifulSoup`: Complements Selenium by parsing HTML snapshots efficiently. It is preferred over lxml or html.parser for its leniency with malformed HTML and ease of selector-based extraction (e.g., finding elements by ID).
-  - `websockets`: Handles OBS WebSocket connections asynchronously, chosen for its lightweight, pure-Python implementation that aligns with `asyncio`. It supports ping/pong for keep-alive, ensuring persistent connections.
-  - `uuid`: Generates unique request IDs for OBS commands, preventing collisions in asynchronous requests.
+## Key Features
 
-These imports are managed within a virtual environment (`venv`), created and populated if absent, ensuring isolation and reproducibility without system-wide installations.
+- **Persistent Virtual Environment**: Manages dependency isolation with automatic creation and verification using a `.roc-venv` marker file.
+- **Robust Network Checks**: Verifies connectivity to scoreboards (e.g., `192.168.1.222:5000`, `192.168.1.251:5000`) and internet (8.8.8.8).
+- **Dynamic Scoreboard Parsing**: Uses Selenium for persistent browser sessions and BeautifulSoup for HTML extraction, ensuring reliable team and timer data retrieval.
+- **Intelligent Game State Detection**: Infers game states (intermission, break, game) using timer-based heuristics, with pause detection to prevent unwanted scene changes.
+- **Ultra-Fast Scene Switching**: Implements instant breakout sequences (`7s Breakout Scene`, `30s Default Scene`, then `Game Scene`) and 40-second rotations during games, optimized with task cancellation and caching.
+- **Graceful Error Handling**: Handles missing bracket files, invalid team names, and network issues with fallbacks and detailed logging.
+- **OBS WebSocket Integration**: Maintains persistent connections with keep-alive pings, robust reconnection logic, and optimized communication.
+- **Manual Pause Control**: Supports manual intervention via `/tmp/roc-pause` file for operator control.
+- **Systemd Service**: Runs as a reliable systemd service for easy deployment and automatic restarts.
 
-## Configuration and Defaults
+## Installation
 
-A global `CONFIG_FILE` points to `/etc/roc/config.json`, with `DEFAULT_CONFIG` providing fallback values. This dictionary structure encapsulates OBS connection details, scoreboard URLs, scene names, and dependencies. The use of JSON for configuration allows easy external modification, merging defaults via a loop to handle missing keys. This design promotes flexibility in deployment, such as switching fields or scenes without code changes.
+### Prerequisites
 
-## ROCController Class Structure
+- **System Requirements**:
+  - Debian-based Linux LXC container (e.g., on Proxmox)
+  - Python 3.8 or higher
+  - Chromium and ChromeDriver
+  - Internet and LAN connectivity to OBS host and scoreboards
 
-The `ROCController` class serves as the central orchestrator, initialized with logging setup, configuration loading, and signal handlers for graceful shutdown (SIGINT/SIGTERM). Key attributes include state trackers like `game_state`, `breakout_triggered`, and `is_paused`, reflecting the system's reactive nature.
+- **Dependencies**:
+  - Python packages: `pandas>=2.2.2`, `obs-websocket-py>=1.0`, `selenium>=4.23.1`, `beautifulsoup4>=4.12.3`, `websockets>=12.0`, `odfpy>=1.4.1`
+  - System packages: `chromium`, `chromedriver`
 
-### Initialization and Setup Methods
+### Setup Steps
 
-- **`__init__`**: Initializes flags, states, and caches. Signal handlers set `exit_flag` for loop termination.
-- **`setup_logging`**: Configures dual handlers (file and stream) at INFO level, suppressing noisy libraries to focus logs on critical events.
-- **`load_config`**: Loads or defaults configuration, merging to ensure completeness.
-- **`manage_venv` and `check_and_install_dependencies`**: Ensure a persistent virtual environment with required packages. `venv.create` is used for isolation, and `subprocess.run` installs dependencies via pip, marking completion to avoid redundancy.
-- **`check_network`**: Verifies connectivity using `socket.create_connection`, essential for fault tolerance in networked setups.
-- **`setup_webdriver` and `cleanup_webdriver`**: Initialize and tear down a headless Chrome instance. Options like `--disable-gpu` optimize resource usage in containers.
+1. **Clone the Repository**:
+   ```bash
+   git clone https://github.com/aab18011/OPS-Live-Controller.git
+   cd roc
+   ```
 
-### Scoreboard Parsing and State Detection
+2. **Install System Dependencies**:
+   ```bash
+   sudo apt update
+   sudo apt install -y python3-venv python3-pip chromium chromedriver
+   ```
 
-- **`wait_for_valid_scoreboard_data`**: Returns a callable for WebDriverWait, checking for non-placeholder team names via JavaScript or DOM fallback. This dual approach handles dynamic content efficiently.
-- **`parse_scoreboard`**: Loads the scoreboard once, then parses repeatedly using BeautifulSoup. It validates data quality, logging parsed values. Persistent sessions reduce overhead compared to per-poll reloads.
-- **`time_to_seconds`**: Converts MM:SS strings to integers, handling errors gracefully.
-- **`detect_game_state`**: Core logic for inferring states ('break', 'game', 'intermission') from timer changes. It detects new games via time jumps or specific values (e.g., 300s for 5-minute games), instant starts when break hits zero, and active timers based on decreasing values. The post-state calculation for `game_just_started` prevents false positives. Logging is throttled to avoid spam.
+3. **Set Up the Virtual Environment**:
+   The script automatically creates a virtual environment at `/opt/roc-venv` and installs dependencies. To manually set it up:
+   ```bash
+   python3 -m venv /opt/roc-venv
+   source /opt/roc-venv/bin/activate
+   pip install --upgrade pandas==2.2.2 obs-websocket-py==1.0 selenium==4.23.1 beautifulsoup4==4.12.3 websockets==12.0 odfpy==1.4.1
+   ```
 
-### Bracket Handling
+4. **Configure the Application**:
+   Create the configuration file at `/etc/roc/config.json`:
+   ```json
+   {
+       "obs": {
+           "host": "192.168.1.****",
+           "port": 4455,
+           "password": "your_obs_password"
+       },
+       "scoreboards": {
+           "field1": "192.168.1.****:****",
+           "field2": "192.168.1.****:****"
+       },
+       "bracket_file": "/path/to/bracket.ods",
+       "chrome_binary": "/path/to/chromium",
+       "chrome_driver": "/path/to/chromedriver",
+       "default_scene": "Default Scene",
+       "break_scene": "Break Scene",
+       "game_scene": "Game Scene",
+       "breakout_scene": "Breakout Scene",
+       "interview_scene": "Interview Scene",
+       "venv_path": "/path/to/venv",
+       "field_number": 1,
+       "polling_interval": 0.1,
+       "dependencies": {
+           "pandas": "2.2.2",
+           "obs-websocket-py": "1.0",
+           "selenium": "4.23.1",
+           "beautifulsoup4": "4.12.3",
+           "websockets": "12.0",
+           "odfpy": "1.4.1"
+       }
+   }
+   ```
+   Update the `host`, `password`, `scoreboards`, and `bracket_file` fields as needed.
 
-- **`read_bracket`**: Parses ODS files into match lists using Pandas, chosen for its engine support ('odf') and DataFrame iteration efficiency.
-- **`match_teams_to_bracket`**: Simple linear search for team matching, sufficient for small brackets.
+5. **Set Up the Systemd Service**:
+   Create `/etc/systemd/system/roc-controller.service`:
+   ```ini
+   [Unit]
+   Description=Remote OBS Controller
+   After=network.target
 
-### OBS Integration
+   [Service]
+   ExecStart=/path/to/venv/bin/python3 /path/to/main.py
+   Restart=always
+   User=root
+   WorkingDirectory=/path/to/wd
 
-- **`authenticate_obs`**: Handles WebSocket authentication via SHA256 hashing, as per OBS protocol.
-- **`connect_obs`**: Establishes a connection with retries and exponential backoff, ensuring reliability.
-- **`switch_scene`**: Sends SetCurrentProgramScene requests, caching to avoid redundancy. For breakout scenes, it skips response waits for speed; others use timeouts with assumptions on failure.
-- **`handle_camera_switching`**: Manages state-based switches asynchronously. For new games, it triggers an instant breakout, scheduling a timed sequence task (cancellable to prevent overlaps). Rotations (40s) are paused during game pauses. This logic ensures professional transitions, with `asyncio.create_task` allowing non-blocking delays.
-- **`keep_obs_alive`**: Periodic pings using `self.obs_ws.open` check, preventing disconnections.
+   [Install]
+   WantedBy=multi-user.target
+   ```
+   Then enable and start the service:
+   ```bash
+   sudo systemctl daemon-reload
+   sudo systemctl enable roc-controller
+   sudo systemctl start roc-controller
+   ```
 
-### Main Execution Loop
+6. **Verify Installation**:
+   Check logs to ensure the service is running:
+   ```bash
+   tail -f /var/log/roc-controller.log
+   ```
 
-- **`run`**: Orchestrates setup, connection, and polling. It detects pauses via unchanged timers (counter >=3), halting rotations. Polling adjusts dynamically: no sleep in critical phases for responsiveness.
-- **`main` and Entry Point**: Async entry with error handling, exiting cleanly.
+## Configuration
 
-## Key Design Choices and Logic
+The configuration file (`/etc/roc/config.json`) defines critical settings:
+- **OBS Settings**: Host, port, and password for OBS WebSocket connection.
+- **Scoreboards**: URLs for field scoreboards (e.g., `192.168.1.****:****` for Field 1).
+- **Bracket File**: Path to the optional `bracket.ods` file for tournament schedules.
+- **Scene Names**: Names of OBS scenes (`Default Scene`, `Break Scene`, etc.).
+- **Virtual Environment**: Path to the persistent `venv` (`/opt/roc-venv`).
+- **Polling Interval**: Set to `0.1s` for ultra-fast polling during critical moments.
 
-The script's asynchronous paradigm (`asyncio`) is pivotal for real-time performance, allowing concurrent WebSocket handling, polling, and timed sequences without blocking. Pause detection mitigates unwanted switches during stalls, using a counter threshold for hysteresis. Task cancellation in sequences prevents overlapping timers from concurrent starts. Library selections prioritize headless, container-friendly tools: Selenium for dynamic web, WebSockets for protocol compliance, and Pandas for data handling. Error handling is graceful, with logs and fallbacks ensuring operational continuity.
+If the configuration file is missing, the script uses defaults but logs a warning. Ensure the `bracket.ods` file is placed at `/root/orss/bracket.ods` if used, or the script will proceed without it.
 
-This architecture exemplifies a reactive, state-driven system, optimized for low-latency automation in live environments.
+## Usage
+
+1. **Start the Service**:
+   ```bash
+   sudo systemctl start roc-controller
+   ```
+
+2. **Monitor Logs**:
+   View real-time logs for debugging:
+   ```bash
+   tail -f /var/log/roc-controller.log
+   ```
+
+3. **Pause/Resume Automation**:
+   - Pause: Create a pause file to enter manual mode:
+     ```bash
+     touch /tmp/roc-pause
+     ```
+   - Resume: Remove the pause file to resume automation:
+     ```bash
+     rm /tmp/roc-pause
+     ```
+
+4. **Stop the Service**:
+   ```bash
+   sudo systemctl stop roc-controller
+   ```
+
+The script monitors the specified scoreboard URL, parsing team names and timers to trigger scene switches:
+- **Intermission**: Switches to `Interview Scene`.
+- **Break**: Switches to `Break Scene`.
+- **Game Start**: Triggers `Breakout Scene` (7s), `Default Scene` (30s), then `Game Scene`.
+- **During Game**: Alternates between `Game Scene` and `Default Scene` every 40s, pausing during game stalls.
+
+## Technical Details
+
+### Architecture
+
+The ROC is implemented as a single Python script (`main.py`) using a class-based architecture (`ROCController`). It leverages `asyncio` for asynchronous, non-blocking operations, ensuring real-time performance. Key components include:
+
+- **Scoreboard Parsing**: Uses Selenium for persistent browser sessions and BeautifulSoup for DOM parsing, prioritizing JavaScript `scoreboardState` access with DOM fallback to handle dynamic content.
+- **Game State Detection**: Infers states based on timer changes, detecting new games via time jumps (>60s), common start times (5min, 10min, 12min), or break timer reaching zero. Pause detection prevents unwanted switches during stalls.
+- **OBS Integration**: Communicates with OBS via WebSocket, with authentication, keep-alive pings, and scene switch caching for efficiency.
+- **Bracket Parsing**: Optionally reads `bracket.ods` files using Pandas with the `odf` engine for tournament schedules.
+- **Error Handling**: Gracefully handles missing files, invalid data, and network issues with fallbacks and detailed logging.
+
+### Design Choices
+
+- **Asynchronous Programming**: `asyncio` ensures non-blocking operations, critical for ultra-fast polling (0.1s) during game starts and breaks.
+- **Persistent Sessions**: Single browser session reduces overhead, with `WebDriverWait` ensuring valid data before parsing.
+- **Scene Switch Optimization**: Caching and task cancellation prevent redundant switches and overlapping sequences.
+- **Container Optimization**: Headless Chrome with options like `--no-sandbox` and `--disable-gpu` ensures compatibility with LXC containers.
+- **Logging**: Comprehensive logging to `/var/log/roc-controller.log` with suppressed third-party verbosity for clarity.
+
+### Version History
+
+See [CHANGELOG.md](CHANGELOG.md) for a detailed version history. Key milestones include:
+- **v2.0.0**: Initial release with bash script orchestration and multiple Python files.
+- **v2.1.0**: Merged into a single `main.py`, improved OBS WebSocket handling.
+- **v2.2.5**: Robust virtual environment checks and dependency management.
+- **v2.2.8**: Removed unused SQLite database for simplicity.
+- **v2.4.0**: Fixed missing bracket file, placeholder team names, and persistent `Interview Scene` issues; added persistent page loading and refined camera logic.
+- **v2.5.0**: Optimized breakout sequence timing for precise game start transitions.
+- **v2.5.0b**: Added mid-match startup support, pause detection, and task cancellation, passing all test cases.
+
+## Development
+
+### Project Structure
+
+```
+roc/
+├── main.py             # Main ROC script
+├── CHANGELOG.md        # Version history
+├── README.md           # This file
+____________external_directory_______________
+└── /etc/roc/
+    └── config.json     # Configuration file
+```
+
+### Contributing
+
+Contributions are welcome! To contribute:
+1. Fork the repository.
+2. Create a feature branch (`git checkout -b feature/your-feature`).
+3. Com changes (`git commit -m 'Add your feature'`).
+4. Push to the branch (`git push origin feature/your-feature`).
+5. Open a pull request.
+
+Please ensure code follows PEP 8 style guidelines and includes tests for new features.
+
+### Testing
+
+The script has been tested for:
+- **Mid-Match Startup**: Correct scene selection when starting during an ongoing match (e.g., post-power surge).
+- **Game State Transitions**: Accurate detection of intermission, break, game, and pause states.
+- **Network Reliability**: Robust handling of network latency (50ms–750ms) and failures.
+- **Scene Switching**: Precise timing for breakout sequences and 40-second rotations.
+
+To run tests locally, set up a test scoreboard server and OBS instance, then start the service and verify logs.
+
+## License
+
+This project is licensed under the Affero-Gnu Public License v3.0 (AGPLv3). See the [LICENSE](LICENSE) file for details.
+
+## Acknowledgments
+
+- Author: Aidan A. Bradley
+- Thomas Brierton (support and feedback)
+- Built for the Outback Paintball Series to enhance live streaming automation.
