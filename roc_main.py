@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-ROC (Remote OBS Controller) Main Application - Phase 2 (Enhanced)
+ROC (Remote OBS Controller) Main Application - Phase 2
 Author: Aidan A. Bradley
-Version: 1.0.1
+Version: 3.0.0b
 
 Enhanced version with:
 - Robust connection management with exponential backoff
