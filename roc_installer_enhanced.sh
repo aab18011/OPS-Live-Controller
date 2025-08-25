@@ -1,7 +1,7 @@
 #!/bin/bash
-# ROC (Remote OBS Controller) Enhanced Installation Script
+# ROC (Remote OBS Controller) Installation Script
 # Author: Aidan A. Bradley
-# Version: 1.0.1
+# Version: 3.0.0b
 #
 # Enhanced installer with:
 # - Improved error handling and rollback
