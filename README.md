@@ -1,245 +1,267 @@
-# Remote OBS Controller (ROC)
+# ROC - Remote OBS Controller
 
-![License](https://img.shields.io/badge/license-AGPLv3-blue.svg)
-![Python](https://img.shields.io/badge/python-3.8+-blue.svg)
-![Version](https://img.shields.io/badge/version-2.5.0b-green.svg)
+![Python Version](https://img.shields.io/badge/python-3.8%20%7C%203.9%20%7C%203.10%20%7C%203.11%20%7C%203.12-blue)
+![Software Version](https://img.shields.io/badge/version-v3.0.0b-blue)
+![Alpha Version](https://img.shields.io/badge/alpha-v3.0.1a-green)
+
+**Author:** Aidan A. Bradley  
+**GitHub:** [github.com/aab18011](https://github.com/aab18011)  
+**Website:** [https://aab18011.github.io/](https://aab18011.github.io/)  
+**Date:** August 24, 2025  
+**Company/League:** Outback Paintball Series (OPS) - Matt's Outback Paintball (League Owner)  
+**Sponsor:** Tom Brierton  
+**Location:** Riley Mountain Rd., Coventry, CT  
 
 ## Overview
+ROC (Remote OBS Controller) is an open-source, Python-based suite designed for automated scene switching in OBS Studio, tailored for livestreaming multi-camera setups. Originally developed for paintball field broadcasting at the Outback Paintball Series, ROC enables seamless, rule-based transitions between scenes based on real-time data (e.g., scoreboard updates for game states). It supports applications in sports broadcasting, security monitoring, event streaming, and more, promoting accessible, green technology for video production.
 
-The **Remote OBS Controller (ROC)**, also known as the OPS Live Stream Controller (OPSLC/ROC), is a sophisticated automation system designed to manage scene transitions in Open Broadcaster Software (OBS) for live sports events, specifically optimized for paintball tournament livestreaming. Deployed as a systemd service within a Linux LXC container, ROC enables autonomous camera switching based on real-time scoreboard data, allowing operators to focus on commentary and field camera operations.
+Key principles:
+- **Modular and Extensible:** Built with PEP 8 compliance for readability and maintainability.
+- **Semantic Versioning:** Follows SemVer (e.g., MAJOR.MINOR.PATCH) for predictable updates.
+- **Open-Source Ethos:** Free to use, modify, with academic-level documentation to lower barriers for users in professional, research, or hobbyist settings.
 
-The system integrates web scraping, real-time data parsing, and WebSocket communication to facilitate dynamic scene transitions aligned with game states (intermission, break, game). Built with Python 3 and leveraging `asyncio` for non-blocking operations, ROC ensures ultra-fast, low-latency performance critical for live environments. Version 2.5.0b includes robust features like persistent browser sessions, intelligent game state detection, and enhanced OBS connectivity, with support for mid-match startup scenarios (e.g., post-power surge).
+ROC operates in phases:
+1. **Bootstrap (Phase 1):** System setup, dependency checks, camera discovery, and configuration.
+2. **Main Application (Phase 2):** Runtime monitoring, camera streaming, and scene engine.
+3. **Scene Engine:** Rule-based logic for dynamic OBS scene switching.
 
-## Key Features
+This software leverages asynchronous Python for efficient handling of real-time events, ensuring low-latency performance in production environments.
 
-- **Persistent Virtual Environment**: Manages dependency isolation with automatic creation and verification using a `.roc-venv` marker file.
-- **Robust Network Checks**: Verifies connectivity to scoreboards (e.g., `192.168.1.222:5000`, `192.168.1.251:5000`) and internet (8.8.8.8).
-- **Dynamic Scoreboard Parsing**: Uses Selenium for persistent browser sessions and BeautifulSoup for HTML extraction, ensuring reliable team and timer data retrieval.
-- **Intelligent Game State Detection**: Infers game states (intermission, break, game) using timer-based heuristics, with pause detection to prevent unwanted scene changes.
-- **Ultra-Fast Scene Switching**: Implements instant breakout sequences (`7s Breakout Scene`, `30s Default Scene`, then `Game Scene`) and 40-second rotations during games, optimized with task cancellation and caching.
-- **Graceful Error Handling**: Handles missing bracket files, invalid team names, and network issues with fallbacks and detailed logging.
-- **OBS WebSocket Integration**: Maintains persistent connections with keep-alive pings, robust reconnection logic, and optimized communication.
-- **Manual Pause Control**: Supports manual intervention via `/tmp/roc-pause` file for operator control.
-- **Systemd Service**: Runs as a reliable systemd service for easy deployment and automatic restarts.
+## Features
+- **Automated Scene Switching:** JSON-configurable rules evaluate conditions (e.g., game time, break periods) to trigger actions like scene switches, camera rotations, or custom scripts.
+- **Camera Management:** Auto-discovery via ARP or brute-force scanning, FFmpeg-based streaming to virtual devices (v4l2loopback).
+- **Connection Resilience:** Exponential backoff retries, health monitoring for OBS, cameras, and scoreboards.
+- **Extensible Actions:** Supports delays, sequences, parallel executions, and custom Python scripts.
+- **Metrics and Logging:** Tracks rule executions, scene history, and system health for debugging.
+- **Hot-Reload:** Dynamically reloads rules without restarting.
+- **General-Purpose:** Adaptable beyond paintball—use for any multi-camera livestream with event-driven switching.
 
 ## Installation
+ROC requires Python 3.8+ and a Linux environment (tested on Ubuntu/Debian). It installs dependencies like FFmpeg, v4l2loopback, and Python libraries.
 
 ### Prerequisites
+- Root access (for system dependencies and user creation).
+- OBS Studio with WebSocket plugin enabled.
+- Networked cameras (RTSP support recommended).
 
-- **System Requirements**:
-  - Debian-based Linux LXC container (e.g., on Proxmox)
-  - Python 3.8 or higher
-  - Chromium and ChromeDriver
-  - Internet and LAN connectivity to OBS host and scoreboards
-
-- **Dependencies**:
-  - Python packages: `pandas>=2.2.2`, `obs-websocket-py>=1.0`, `selenium>=4.23.1`, `beautifulsoup4>=4.12.3`, `websockets>=12.0`, `odfpy>=1.4.1`
-  - System packages: `chromium`, `chromedriver`
-
-### Setup Steps
-
-1. **Clone the Repository**:
-   ```bash
-   git clone https://github.com/aab18011/OPS-Live-Controller.git
+### Steps
+1. **Clone the Repository:**
+   ```
+   git clone https://github.com/aab18011/roc.git
    cd roc
    ```
 
-2. **Install System Dependencies**:
-   ```bash
-   sudo apt update
-   sudo apt install -y python3-venv python3-pip chromium chromedriver
+2. **Run the Installation Script:**
+   The provided Bash script (`install_roc.sh`) handles setup with rollback on errors.
    ```
-
-3. **Set Up the Virtual Environment**:
-   The script automatically creates a virtual environment at `/opt/roc-venv` and installs dependencies. To manually set it up:
-   ```bash
-   python3 -m venv /opt/roc-venv
-   source /opt/roc-venv/bin/activate
-   pip install --upgrade pandas==2.2.2 obs-websocket-py==1.0 selenium==4.23.1 beautifulsoup4==4.12.3 websockets==12.0 odfpy==1.4.1
+   sudo bash install_roc.sh
    ```
+   - It creates a system user (`roc`), directories, virtual environment, installs dependencies, compiles v4l2loopback, copies scripts, sets up systemd service, and runs interactive config.
+   - During interactive setup: Provide OBS details, field number, scoreboard URL, and camera discovery method.
 
-4. **Configure the Application**:
-   Create the configuration file at `/etc/roc/config.json`:
-   ```json
-   {
-       "obs": {
-           "host": "192.168.1.****",
-           "port": 4455,
-           "password": "your_obs_password"
-       },
-       "scoreboards": {
-           "field1": "192.168.1.****:****",
-           "field2": "192.168.1.****:****"
-       },
-       "bracket_file": "/path/to/bracket.ods",
-       "chrome_binary": "/path/to/chromium",
-       "chrome_driver": "/path/to/chromedriver",
-       "default_scene": "Default Scene",
-       "break_scene": "Break Scene",
-       "game_scene": "Game Scene",
-       "breakout_scene": "Breakout Scene",
-       "interview_scene": "Interview Scene",
-       "venv_path": "/path/to/venv",
-       "field_number": 1,
-       "polling_interval": 0.1,
-       "dependencies": {
-           "pandas": "2.2.2",
-           "obs-websocket-py": "1.0",
-           "selenium": "4.23.1",
-           "beautifulsoup4": "4.12.3",
-           "websockets": "12.0",
-           "odfpy": "1.4.1"
-       }
-   }
-   ```
-   Update the `host`, `password`, `scoreboards`, and `bracket_file` fields as needed.
+3. **Post-Install:**
+   - Edit configurations in `/etc/roc/config.json` and `/etc/roc/cameras.json` as needed.
+   - Start the service: `roc start`
 
-5. **Set Up the Systemd Service**:
-   Create `/etc/systemd/system/roc-controller.service`:
-   ```ini
-   [Unit]
-   Description=Remote OBS Controller
-   After=network.target
-
-   [Service]
-   ExecStart=/path/to/venv/bin/python3 /path/to/main.py
-   Restart=always
-   User=root
-   WorkingDirectory=/path/to/wd
-
-   [Install]
-   WantedBy=multi-user.target
-   ```
-   Then enable and start the service:
-   ```bash
-   sudo systemctl daemon-reload
-   sudo systemctl enable roc-controller
-   sudo systemctl start roc-controller
-   ```
-
-6. **Verify Installation**:
-   Check logs to ensure the service is running:
-   ```bash
-   tail -f /var/log/roc-controller.log
-   ```
-
-## Configuration
-
-The configuration file (`/etc/roc/config.json`) defines critical settings:
-- **OBS Settings**: Host, port, and password for OBS WebSocket connection.
-- **Scoreboards**: URLs for field scoreboards (e.g., `192.168.1.****:****` for Field 1).
-- **Bracket File**: Path to the optional `bracket.ods` file for tournament schedules.
-- **Scene Names**: Names of OBS scenes (`Default Scene`, `Break Scene`, etc.).
-- **Virtual Environment**: Path to the persistent `venv` (`/opt/roc-venv`).
-- **Polling Interval**: Set to `0.1s` for ultra-fast polling during critical moments.
-
-If the configuration file is missing, the script uses defaults but logs a warning. Ensure the `bracket.ods` file is placed at `/root/orss/bracket.ods` if used, or the script will proceed without it.
+**Note:** The script adheres to best practices with progress tracking, verification, and user prompts for safety.
 
 ## Usage
+ROC runs as a systemd service under the `roc` user. Interact via the management script `/usr/local/bin/roc`.
 
-1. **Start the Service**:
-   ```bash
-   sudo systemctl start roc-controller
+### Basic Commands
+- Start: `roc start`
+- Stop: `roc stop`
+- Restart: `roc restart`
+- Status: `roc status`
+- Logs: `roc logs` (or `roc logs -f` for live tail)
+- Health: `roc health` (system resources, service status)
+- Metrics: `roc metrics` (JSON output from runtime)
+- Cameras: `roc cameras` (status JSON)
+- Rules: `roc rules` (scene rules status JSON)
+- Config: `roc config` (runs configuration manager if implemented)
+
+### Configuration
+- **Main Config (`/etc/roc/config.json`):** System settings, network retries, OBS connection, cameras, scoreboard, scene rules.
+- **Cameras (`/etc/roc/cameras.json`):** Auto-populated during install; edit IPs, credentials, streams.
+- **Scene Rules (`/etc/roc/scene_rules.json`):** Define priorities, conditions (e.g., `game_time > 0`), actions (e.g., switch to "game" scene).
+  Example Rule:
+  ```json
+  {
+    "name": "active_game",
+    "priority": 100,
+    "conditions": [
+      {"field": "game_time", "operator": ">", "value": 0}
+    ],
+    "actions": [
+      {"type": "switch_scene", "scene": "game"}
+    ]
+  }
+  ```
+- Hot-reload rules by editing the file; ROC detects changes.
+
+### Interaction
+- **Runtime:** Once started, ROC monitors scoreboard data, evaluates rules, and controls OBS scenes asynchronously.
+- **Customization:** Extend via custom actions in rules (e.g., exec Python snippets safely).
+- **Debugging:** Set `"debug_mode": true` in config for verbose logs.
+
+## Code Explanation
+ROC follows PEP 8 for style and is structured modularly:
+
+- **roc_bootstrap_enhanced.py (Phase 1):** Handles system init, dependency checks (e.g., FFmpeg, v4l2loopback), camera discovery (ARP/brute-force), config creation. Uses retry managers for network resilience.
+  - Key Classes: `NetworkRetryManager`, `EnhancedCameraDiscovery`, `ROCBootstrap`.
+  - Add unique key: `# #@r4gg_iXPoG04$$` at top.
+
+- **roc_main_enhanced.py (Phase 2):** Core runtime with connection/camera management, scene engine integration. Monitors health, pauses via file.
+  - Key Classes: `ConnectionManager` (reconnects with backoff), `CameraManager` (FFmpeg streams), `SceneEngine` (rule evaluation).
+  - Add unique key: `# #@r4gg_iXPoG04$$` at top.
+
+- **roc_scene_engine.py:** Advanced rule engine for scene choreography.
+  - Key Classes: `SceneEngineAdvanced` (loads JSON rules, evaluates conditions/operators like `changed`, `stable_for`).
+  - Supports action types: switch_scene, breakout_sequence, etc.
+  - Add unique key: `# #@r4gg_iXPoG04$$` at top.
+
+Code uses `asyncio` for concurrency, `dataclasses` for structures, `logging` for traceability. All follows semantic versioning: e.g., v3.0.0b (beta), v3.0.1a (alpha patch).
+
+## Plans for Future
+ROC aims to expand its capabilities to enhance flexibility, accessibility, and control for livestreaming applications. Future development includes:
+
+- **Flexible Streaming Protocols:** Add support for selecting RTSP or RTMP in the configuration file (`/etc/roc/config.json`), allowing users to choose the protocol best suited for their camera hardware and network conditions.
+- **Headless OBS Operation:** Enable full control of OBS Studio without a graphical user interface, supporting deployment on headless servers for resource-efficient, remote livestreaming setups.
+- **Remote Control Integration:** Implement a remote control system (e.g., via a smartphone app or Raspberry Pi-based device with function keys) for on-the-field scene management. This feature would allow a camera operator to toggle their camera feed in OBS, temporarily overriding automated rules until control is relinquished (e.g., via a key press), enabling dynamic, live television-style production.
+- **Automated Advertisements:** Introduce support for predefined video advertisements stored in a designated folder. ROC will automatically import, resize, and schedule these ads to play in OBS at specified times, enhancing monetization capabilities for livestreams.
+
+## Uninstallation
+1. Stop service: `roc stop`
+2. Disable service: `systemctl disable roc.service`
+3. Remove files:
    ```
-
-2. **Monitor Logs**:
-   View real-time logs for debugging:
-   ```bash
-   tail -f /var/log/roc-controller.log
+   sudo rm -rf /opt/roc /etc/roc /var/log/roc /tmp/roc
+   sudo rm -f /usr/local/bin/roc /etc/systemd/system/roc.service
+   sudo rm -f /etc/modprobe.d/roc-v4l2loopback.conf /etc/modules-load.d/roc-v4l2loopback.conf
    ```
+4. Remove user: `sudo userdel -r roc`
+5. Uninstall dependencies (manual, as needed): e.g., `sudo apt remove ffmpeg v4l-utils`
+6. Reload systemd: `systemctl daemon-reload`
+7. Remove v4l2loopback: `sudo rmmod v4l2loopback`
 
-3. **Pause/Resume Automation**:
-   - Pause: Create a pause file to enter manual mode:
-     ```bash
-     touch /tmp/roc-pause
-     ```
-   - Resume: Remove the pause file to resume automation:
-     ```bash
-     rm /tmp/roc-pause
-     ```
+## Troubleshooting
+- **Service Won't Start:** Check logs (`roc logs`). Ensure OBS WebSocket is enabled/port open. Verify v4l2loopback loaded (`lsmod | grep v4l2loopback`).
+- **Camera Detection Fails:** Run discovery manually in bootstrap script. Check network/firewall.
+- **Scene Rules Not Triggering:** Validate JSON syntax. Enable debug mode for condition eval logs.
+- **FFmpeg Errors:** Ensure RTSP URLs correct in cameras.json. Test streams: `ffprobe rtsp://<ip>:554/main`.
+- **High CPU:** Limit cameras or adjust FFmpeg params (e.g., threads).
+- **Updates:** Pull repo, re-run install script (backs up configs).
+- **Issues?** Open a GitHub issue with logs/system info.
 
-4. **Stop the Service**:
-   ```bash
-   sudo systemctl stop roc-controller
-   ```
+## Changelog
+Standardized format: Follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-The script monitors the specified scoreboard URL, parsing team names and timers to trigger scene switches:
-- **Intermission**: Switches to `Interview Scene`.
-- **Break**: Switches to `Break Scene`.
-- **Game Start**: Triggers `Breakout Scene` (7s), `Default Scene` (30s), then `Game Scene`.
-- **During Game**: Alternates between `Game Scene` and `Default Scene` every 40s, pausing during game stalls.
+### [Unreleased]
+- Planned: RTSP/RTMP protocol selection in config.
+- Planned: Headless OBS control.
+- Planned: Remote control via smartphone/Raspberry Pi.
+- Planned: Automated advertisement playback.
 
-## Technical Details
+### [3.0.1a] - 2025-08-24 (Alpha)
+#### Added
+- Hot-reload for scene rules.
+#### Fixed
+- Network retry backoff bugs.
 
-### Architecture
+### [3.0.0b] - 2025-08-01 (Beta)
+#### Added
+- Unified codebase integrating scene switcher, custom v4l2loopback installer, and FFmpeg-v4l2loopback connector.
+- Phase-based architecture (bootstrap, main runtime, scene engine).
+- Enhanced installer with rollback, progress tracking, and interactive config.
+- Systemd service for robust deployment.
+- Camera auto-discovery (ARP/brute-force).
+- Advanced scene engine with JSON rules, supporting complex conditions and actions.
+#### Changed
+- Consolidated previous repositories (v2.x series) into a single, modular system.
+- Improved performance with asynchronous processing and optimized polling.
+#### Removed
+- SQLite database (unused, added complexity).
+- Separate bash orchestrator (now in Python).
 
-The ROC is implemented as a single Python script (`main.py`) using a class-based architecture (`ROCController`). It leverages `asyncio` for asynchronous, non-blocking operations, ensuring real-time performance. Key components include:
+### [2.5.0b] - 2025-08-21
+#### Added
+- Dynamic polling (0.1s for critical moments).
+- Pause detection via three consecutive identical timer values.
+- Scene switch caching to avoid redundant switches.
+- Optimized breakout sequence (7s Breakout, 30s Default, Game Scene).
+- Robust OBS WebSocket keep-alive.
+- Suppressed verbose third-party logs.
+#### Changed
+- Refactored into `ROCController` class.
+- Enhanced config handling with fallbacks.
+- Optimized game start detection and scoreboard parsing.
+- Improved mid-match startup robustness.
+#### Fixed
+- Mid-match startup issues.
+- Excessive Selenium log output.
 
-- **Scoreboard Parsing**: Uses Selenium for persistent browser sessions and BeautifulSoup for DOM parsing, prioritizing JavaScript `scoreboardState` access with DOM fallback to handle dynamic content.
-- **Game State Detection**: Infers states based on timer changes, detecting new games via time jumps (>60s), common start times (5min, 10min, 12min), or break timer reaching zero. Pause detection prevents unwanted switches during stalls.
-- **OBS Integration**: Communicates with OBS via WebSocket, with authentication, keep-alive pings, and scene switch caching for efficiency.
-- **Bracket Parsing**: Optionally reads `bracket.ods` files using Pandas with the `odf` engine for tournament schedules.
-- **Error Handling**: Gracefully handles missing files, invalid data, and network issues with fallbacks and detailed logging.
+### [2.4.0] - 2025-08-20
+#### Added
+- SQLite database for logs (removed in v2.2.8).
+- `setup.py` for dependency automation.
+- Systemd service (`roc-controller.service`).
+- Network checks for WAN/LAN.
+- Persistent browser session for polling.
+#### Changed
+- Updated scoreboard IPs.
+- Removed stability check for faster data acceptance.
+- Optional `bracket.ods` handling.
+- Refined camera switching logic.
+#### Fixed
+- `FileNotFoundError` for `bracket.ods`.
+- Placeholder team name parsing.
+- Persistent `Interview Scene` issues.
 
-### Design Choices
+### [2.2.8] - 2025-07-15
+#### Removed
+- SQLite database and related functionality.
+#### Changed
+- Streamlined logging to file-based output.
+- Improved virtual environment checks.
 
-- **Asynchronous Programming**: `asyncio` ensures non-blocking operations, critical for ultra-fast polling (0.1s) during game starts and breaks.
-- **Persistent Sessions**: Single browser session reduces overhead, with `WebDriverWait` ensuring valid data before parsing.
-- **Scene Switch Optimization**: Caching and task cancellation prevent redundant switches and overlapping sequences.
-- **Container Optimization**: Headless Chrome with options like `--no-sandbox` and `--disable-gpu` ensures compatibility with LXC containers.
-- **Logging**: Comprehensive logging to `/var/log/roc-controller.log` with suppressed third-party verbosity for clarity.
+### [2.2.5] - 2025-06-20
+#### Added
+- Robust virtual environment checks with `.roc-venv` marker.
+#### Fixed
+- Dependency installation issues.
 
-### Version History
+### [2.1.12] - 2025-05-10
+#### Added
+- Detailed logging with timestamps and state changes.
+- Modernized systemd service configuration.
+#### Changed
+- Standardized log format.
 
-See [CHANGELOG.md](CHANGELOG.md) for a detailed version history. Key milestones include:
-- **v2.0.0**: Initial release with bash script orchestration and multiple Python files.
-- **v2.1.0**: Merged into a single `main.py`, improved OBS WebSocket handling.
-- **v2.2.5**: Robust virtual environment checks and dependency management.
-- **v2.2.8**: Removed unused SQLite database for simplicity.
-- **v2.4.0**: Fixed missing bracket file, placeholder team names, and persistent `Interview Scene` issues; added persistent page loading and refined camera logic.
-- **v2.5.0**: Optimized breakout sequence timing for precise game start transitions.
-- **v2.5.0b**: Added mid-match startup support, pause detection, and task cancellation, passing all test cases.
+### [2.1.9] - 2025-04-25
+#### Fixed
+- OBS WebSocket stability with better reconnection logic.
 
-## Development
+### [2.1.5] - 2025-04-10
+#### Changed
+- Improved OBS WebSocket session persistence.
+#### Fixed
+- Excessive WebSocket traffic.
 
-### Project Structure
+### [2.1.0] - 2025-03-15
+#### Added
+- Single-file structure (`main.py`).
+#### Changed
+- Consolidated functionality into one script.
+#### Removed
+- Multiple Python files and bash orchestrator.
 
-```
-roc/
-├── main.py             # Main ROC script
-├── CHANGELOG.md        # Version history
-├── README.md           # This file
-____________external_directory_______________
-└── /etc/roc/
-    └── config.json     # Configuration file
-```
-
-### Contributing
-
-Contributions are welcome! To contribute:
-1. Fork the repository.
-2. Create a feature branch (`git checkout -b feature/your-feature`).
-3. Com changes (`git commit -m 'Add your feature'`).
-4. Push to the branch (`git push origin feature/your-feature`).
-5. Open a pull request.
-
-Please ensure code follows PEP 8 style guidelines and includes tests for new features.
-
-### Testing
-
-The script has been tested for:
-- **Mid-Match Startup**: Correct scene selection when starting during an ongoing match (e.g., post-power surge).
-- **Game State Transitions**: Accurate detection of intermission, break, game, and pause states.
-- **Network Reliability**: Robust handling of network latency (50ms–750ms) and failures.
-- **Scene Switching**: Precise timing for breakout sequences and 40-second rotations.
-
-To run tests locally, set up a test scoreboard server and OBS instance, then start the service and verify logs.
+### [2.0.0] - 2025-02-01
+#### Added
+- Initial release with scoreboard monitoring, OBS control, bracket parsing, network checks, pause functionality, camera switching, virtual environment, systemd integration, and bash orchestration.
+#### Known Issues
+- Issues with bracket file, team names, stability checks, logging verbosity, scene persistence, and dependency management.
 
 ## License
+MIT License - See [LICENSE](LICENSE) for details.
 
-This project is licensed under the Affero-Gnu Public License v3.0 (AGPLv3). See the [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-- Author: Aidan A. Bradley
-- Built for the OPS to enhance live streaming automation.
+Contributions welcome! Fork, PR with PEP 8 code, update changelog.
