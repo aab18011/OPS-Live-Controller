@@ -13,148 +13,182 @@
 **Location:** Riley Mountain Rd., Coventry, CT  
 
 ## Overview
-ROC (Remote OBS Controller) is an open-source, Python-based suite designed for automated scene switching in OBS Studio, tailored for livestreaming multi-camera setups. Originally developed for paintball field broadcasting at the Outback Paintball Series, ROC enables seamless, rule-based transitions between scenes based on real-time data (e.g., scoreboard updates for game states). It supports applications in sports broadcasting, security monitoring, event streaming, and more, promoting accessible, green technology for video production.
+ROC (Remote OBS Controller) is an open-source, Python-based suite for automated scene switching in OBS Studio, designed for livestreaming multi-camera setups. Initially developed for the Outback Paintball Series to broadcast paintball tournaments, ROC integrates scene switching, a custom v4l2loopback installer, and FFmpeg-based camera streaming into a unified system.
 
 Key principles:
-- **Modular and Extensible:** Built with PEP 8 compliance for readability and maintainability.
-- **Semantic Versioning:** Follows SemVer (e.g., MAJOR.MINOR.PATCH) for predictable updates.
-- **Open-Source Ethos:** Free to use, modify, with academic-level documentation to lower barriers for users in professional, research, or hobbyist settings.
+- **Unified Architecture:** Combines previously separate repositories (scene switcher, v4l2loopback installer, FFmpeg connector) into one cohesive codebase.
+- **PEP 8 Compliance:** Ensures readable, maintainable code.
+- **Semantic Versioning:** Follows MAJOR.MINOR.PATCH (e.g., v3.0.0b for beta, v3.0.1a for alpha).
+- **Open-Source Ethos:** Licensed under MIT, with academic-level documentation to support users in education, research, or hobbyist contexts.
 
-ROC operates in phases:
-1. **Bootstrap (Phase 1):** System setup, dependency checks, camera discovery, and configuration.
-2. **Main Application (Phase 2):** Runtime monitoring, camera streaming, and scene engine.
-3. **Scene Engine:** Rule-based logic for dynamic OBS scene switching.
-
-This software leverages asynchronous Python for efficient handling of real-time events, ensuring low-latency performance in production environments.
+ROC operates in two phases:
+1. **Bootstrap (Phase 1):** Initializes system, checks dependencies, discovers cameras, and configures settings.
+2. **Main Application (Phase 2):** Manages runtime operations, camera streaming, and scene switching via a rule-based engine.
 
 ## Features
-- **Automated Scene Switching:** JSON-configurable rules evaluate conditions (e.g., game time, break periods) to trigger actions like scene switches, camera rotations, or custom scripts.
-- **Camera Management:** Auto-discovery via ARP or brute-force scanning, FFmpeg-based streaming to virtual devices (v4l2loopback).
-- **Connection Resilience:** Exponential backoff retries, health monitoring for OBS, cameras, and scoreboards.
-- **Extensible Actions:** Supports delays, sequences, parallel executions, and custom Python scripts.
-- **Metrics and Logging:** Tracks rule executions, scene history, and system health for debugging.
-- **Hot-Reload:** Dynamically reloads rules without restarting.
-- **General-Purpose:** Adaptable beyond paintball—use for any multi-camera livestream with event-driven switching.
+- **Automated Scene Switching:** JSON-defined rules trigger scene changes based on real-time data (e.g., game state, timers).
+- **Camera Management:** Auto-discovers cameras (ARP/brute-force), streams via FFmpeg to v4l2loopback devices.
+- **Resilience:** Exponential backoff for network retries, health monitoring for OBS, cameras, and scoreboards.
+- **Extensible Actions:** Supports delays, sequences, parallel actions, and custom scripts.
+- **Metrics & Logging:** Tracks rule executions, scene history, and system health.
+- **Hot-Reload:** Dynamically updates rules without restarting.
+- **Versatile:** Adaptable for any multi-camera livestream with event-driven switching.
+
+## System Requirements
+- **OS**: Ubuntu 20.04+, Debian 11+, CentOS 8+, or Arch Linux
+- **Hardware**: 2GB RAM (4GB recommended), 2-core CPU, 10GB free disk space
+- **Network**: Stable LAN for cameras/scoreboards; internet for dependency installation
+- **Software**: Python 3.8+, OBS Studio with WebSocket plugin v5.0+
 
 ## Installation
-ROC requires Python 3.8+ and a Linux environment (tested on Ubuntu/Debian). It installs dependencies like FFmpeg, v4l2loopback, and Python libraries.
+Requires Python 3.8+ and Linux (tested on Ubuntu/Debian). Installs FFmpeg, v4l2loopback, and Python dependencies.
 
-### Prerequisites
-- Root access (for system dependencies and user creation).
-- OBS Studio with WebSocket plugin enabled.
-- Networked cameras (RTSP support recommended).
+### Quick Start
+```bash
+git clone https://github.com/aab18011/roc.git
+cd roc
+sudo bash install_roc.sh
+roc start
+```
+See [Installation](#installation) for detailed setup and [Usage](#usage) for commands.
 
-### Steps
-1. **Clone the Repository:**
-   ```
+### Detailed Installation
+1. **Clone Repository:**
+   ```bash
    git clone https://github.com/aab18011/roc.git
    cd roc
    ```
-
-2. **Run the Installation Script:**
-   The provided Bash script (`install_roc.sh`) handles setup with rollback on errors.
-   ```
+2. **Run Installer:**
+   ```bash
    sudo bash install_roc.sh
    ```
-   - It creates a system user (`roc`), directories, virtual environment, installs dependencies, compiles v4l2loopback, copies scripts, sets up systemd service, and runs interactive config.
-   - During interactive setup: Provide OBS details, field number, scoreboard URL, and camera discovery method.
-
+   - Creates `roc` user, directories, virtual environment, installs dependencies, compiles v4l2loopback, sets up systemd service, and runs interactive config.
+   - Prompts for OBS details, field number, scoreboard URL, and camera discovery method.
 3. **Post-Install:**
-   - Edit configurations in `/etc/roc/config.json` and `/etc/roc/cameras.json` as needed.
-   - Start the service: `roc start`
-
-**Note:** The script adheres to best practices with progress tracking, verification, and user prompts for safety.
+   - Edit `/etc/roc/config.json` and `/etc/roc/cameras.json`.
+   - Start service: `roc start`
 
 ## Usage
-ROC runs as a systemd service under the `roc` user. Interact via the management script `/usr/local/bin/roc`.
+Runs as a systemd service under the `roc` user. Manage via `/usr/local/bin/roc`.
 
-### Basic Commands
-- Start: `roc start`
-- Stop: `roc stop`
-- Restart: `roc restart`
-- Status: `roc status`
-- Logs: `roc logs` (or `roc logs -f` for live tail)
-- Health: `roc health` (system resources, service status)
-- Metrics: `roc metrics` (JSON output from runtime)
-- Cameras: `roc cameras` (status JSON)
-- Rules: `roc rules` (scene rules status JSON)
-- Config: `roc config` (runs configuration manager if implemented)
+### Commands
+- `roc start`: Start service.
+- `roc stop`: Stop service.
+- `roc restart`: Restart service.
+- `roc status`: Check status.
+- `roc logs [-f]`: View logs (live with `-f`).
+- `roc health`: Show system resources, service status.
+- `roc metrics`: Display runtime metrics (JSON).
+- `roc cameras`: List camera status (JSON).
+- `roc rules`: Show scene rules status (JSON).
+- `roc config`: Run configuration manager (if implemented).
 
 ### Configuration
-- **Main Config (`/etc/roc/config.json`):** System settings, network retries, OBS connection, cameras, scoreboard, scene rules.
-- **Cameras (`/etc/roc/cameras.json`):** Auto-populated during install; edit IPs, credentials, streams.
-- **Scene Rules (`/etc/roc/scene_rules.json`):** Define priorities, conditions (e.g., `game_time > 0`), actions (e.g., switch to "game" scene).
-  Example Rule:
+- **Main Config (`/etc/roc/config.json`):** Defines system, network, OBS, camera, scoreboard, and scene settings.
+- **Cameras (`/etc/roc/cameras.json`):** Lists camera IPs, credentials, streams.
+- **Scene Rules (`/etc/roc/scene_rules.json`):** Specifies conditions and actions.
+  #### Example Configurations
+  **Cameras (`/etc/roc/cameras.json`):**
   ```json
   {
-    "name": "active_game",
-    "priority": 100,
+    "cameras": [
+      {
+        "id": "cam1",
+        "ip": "192.168.1.100",
+        "port": 554,
+        "protocol": "rtsp",
+        "path": "/main",
+        "username": "admin",
+        "password": "pass123",
+        "stream_type": "main"
+      }
+    ]
+  }
+  ```
+
+  **Complex Scene Rule (`/etc/roc/scene_rules.json`):**
+  ```json
+  {
+    "name": "game_with_timeout",
+    "priority": 80,
     "conditions": [
-      {"field": "game_time", "operator": ">", "value": 0}
+      {"field": "game_time", "operator": ">", "value": 0},
+      {"field": "timeout_active", "operator": "=", "value": true}
     ],
     "actions": [
+      {"type": "switch_scene", "scene": "timeout"},
+      {"type": "delay", "value": 5},
       {"type": "switch_scene", "scene": "game"}
     ]
   }
   ```
-- Hot-reload rules by editing the file; ROC detects changes.
+- Hot-reload rules by editing `scene_rules.json`.
 
 ### Interaction
-- **Runtime:** Once started, ROC monitors scoreboard data, evaluates rules, and controls OBS scenes asynchronously.
-- **Customization:** Extend via custom actions in rules (e.g., exec Python snippets safely).
+- **Runtime:** Monitors scoreboards, evaluates rules, controls OBS scenes asynchronously.
+- **Customization:** Add custom actions in rules (e.g., Python snippets).
 - **Debugging:** Set `"debug_mode": true` in config for verbose logs.
 
 ## Code Explanation
-ROC follows PEP 8 for style and is structured modularly:
+Adheres to PEP 8, structured modularly:
+- **roc_bootstrap_enhanced.py:** Initializes system, checks dependencies, discovers cameras. Uses `NetworkRetryManager`, `EnhancedCameraDiscovery`, `ROCBootstrap`.
+- **roc_main_enhanced.py:** Manages runtime, cameras, scene engine. Includes `ConnectionManager`, `CameraManager`, `SceneEngine`.
+- **roc_scene_engine.py:** Rule-based engine for scene switching. Uses `SceneEngineAdvanced` for JSON rule evaluation.
 
-- **roc_bootstrap_enhanced.py (Phase 1):** Handles system init, dependency checks (e.g., FFmpeg, v4l2loopback), camera discovery (ARP/brute-force), config creation. Uses retry managers for network resilience.
-  - Key Classes: `NetworkRetryManager`, `EnhancedCameraDiscovery`, `ROCBootstrap`.
-  - Add unique key: `# #@r4gg_iXPoG04$$` at top.
-
-- **roc_main_enhanced.py (Phase 2):** Core runtime with connection/camera management, scene engine integration. Monitors health, pauses via file.
-  - Key Classes: `ConnectionManager` (reconnects with backoff), `CameraManager` (FFmpeg streams), `SceneEngine` (rule evaluation).
-  - Add unique key: `# #@r4gg_iXPoG04$$` at top.
-
-- **roc_scene_engine.py:** Advanced rule engine for scene choreography.
-  - Key Classes: `SceneEngineAdvanced` (loads JSON rules, evaluates conditions/operators like `changed`, `stable_for`).
-  - Supports action types: switch_scene, breakout_sequence, etc.
-  - Add unique key: `# #@r4gg_iXPoG04$$` at top.
-
-Code uses `asyncio` for concurrency, `dataclasses` for structures, `logging` for traceability. All follows semantic versioning: e.g., v3.0.0b (beta), v3.0.1a (alpha patch).
+Uses `asyncio` for concurrency, `dataclasses` for structures, `logging` for traceability.
 
 ## Plans for Future
-ROC aims to expand its capabilities to enhance flexibility, accessibility, and control for livestreaming applications. Future development includes:
-
-- **Flexible Streaming Protocols:** Add support for selecting RTSP or RTMP in the configuration file (`/etc/roc/config.json`), allowing users to choose the protocol best suited for their camera hardware and network conditions.
-- **Headless OBS Operation:** Enable full control of OBS Studio without a graphical user interface, supporting deployment on headless servers for resource-efficient, remote livestreaming setups.
-- **Remote Control Integration:** Implement a remote control system (e.g., via a smartphone app or Raspberry Pi-based device with function keys) for on-the-field scene management. This feature would allow a camera operator to toggle their camera feed in OBS, temporarily overriding automated rules until control is relinquished (e.g., via a key press), enabling dynamic, live television-style production.
-- **Automated Advertisements:** Introduce support for predefined video advertisements stored in a designated folder. ROC will automatically import, resize, and schedule these ads to play in OBS at specified times, enhancing monetization capabilities for livestreams.
+ROC aims to enhance flexibility and control for livestreaming. Planned features include:
+- **RTSP/RTMP Support**: Add `"protocol": "rtsp"` or `"rtmp"` in `cameras.json` to support varied camera types. *Challenge*: Ensuring compatibility with diverse camera firmware.
+- **Headless OBS**: Enable OBS control without a GUI via WebSocket, ideal for lightweight servers. *Challenge*: Testing on minimal Linux distros.
+- **Remote Control**: Develop a mobile app or Raspberry Pi interface for on-the-field scene toggling, with override priority. *Challenge*: Secure key-based authentication for remote commands.
+- **Automated Ads**: Import video ads from a folder, resize via FFmpeg, and schedule in OBS. *Challenge*: Optimizing resize performance for real-time playback.
 
 ## Uninstallation
 1. Stop service: `roc stop`
 2. Disable service: `systemctl disable roc.service`
 3. Remove files:
-   ```
+   ```bash
    sudo rm -rf /opt/roc /etc/roc /var/log/roc /tmp/roc
    sudo rm -f /usr/local/bin/roc /etc/systemd/system/roc.service
    sudo rm -f /etc/modprobe.d/roc-v4l2loopback.conf /etc/modules-load.d/roc-v4l2loopback.conf
    ```
 4. Remove user: `sudo userdel -r roc`
-5. Uninstall dependencies (manual, as needed): e.g., `sudo apt remove ffmpeg v4l-utils`
+5. Remove dependencies (optional): `sudo apt remove ffmpeg v4l-utils`
 6. Reload systemd: `systemctl daemon-reload`
 7. Remove v4l2loopback: `sudo rmmod v4l2loopback`
 
 ## Troubleshooting
-- **Service Won't Start:** Check logs (`roc logs`). Ensure OBS WebSocket is enabled/port open. Verify v4l2loopback loaded (`lsmod | grep v4l2loopback`).
-- **Camera Detection Fails:** Run discovery manually in bootstrap script. Check network/firewall.
-- **Scene Rules Not Triggering:** Validate JSON syntax. Enable debug mode for condition eval logs.
-- **FFmpeg Errors:** Ensure RTSP URLs correct in cameras.json. Test streams: `ffprobe rtsp://<ip>:554/main`.
-- **High CPU:** Limit cameras or adjust FFmpeg params (e.g., threads).
-- **Updates:** Pull repo, re-run install script (backs up configs).
-- **Issues?** Open a GitHub issue with logs/system info.
+### Common Issues
+| Issue | Possible Cause | Solution |
+|-------|----------------|----------|
+| FFmpeg stream fails | Incorrect RTSP URL | Verify URL with `ffprobe rtsp://<ip>:554/main` |
+| OBS WebSocket error | Wrong port/password | Check `/etc/roc/config.json` for correct `obs` settings |
+| High CPU usage | Too many cameras | Reduce cameras or set FFmpeg `-threads 2` in `cameras.json` |
+| Rules not triggering | Invalid JSON syntax | Validate `scene_rules.json`; enable `"debug_mode": true` |
+| Service fails to start | v4l2loopback not loaded | Check `lsmod | grep v4l2loopback`; reload with `modprobe v4l2loopback` |
+
+### Support
+Open a [GitHub Issue](https://github.com/aab18011/roc/issues) with logs and system details.
+
+## Contributing
+We welcome contributions to ROC! To contribute:
+1. Fork the repository and create a feature branch (`git checkout -b feature/xyz`).
+2. Follow PEP 8.
+3. Update the [Changelog](#changelog) with your changes.
+4. Submit a pull request with a clear description.
+5. For bugs or features, open an issue with logs and steps to reproduce.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
+
+## Disclaimer
+ROC is provided "as is" without warranty of any kind. Use at your own risk, and ensure proper configuration for production environments.
+
+## License
+ROC is licensed under the MIT License. See [LICENSE](LICENSE) or the [MIT License text](https://opensource.org/licenses/MIT).
 
 ## Changelog
-Standardized format: Follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+Follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and Semantic Versioning.
 
 ### [Unreleased]
 - Planned: RTSP/RTMP protocol selection in config.
@@ -170,18 +204,18 @@ Standardized format: Follows [Keep a Changelog](https://keepachangelog.com/en/1.
 
 ### [3.0.0b] - 2025-08-01 (Beta)
 #### Added
-- Unified codebase integrating scene switcher, custom v4l2loopback installer, and FFmpeg-v4l2loopback connector.
+- Unified codebase, merging scene switcher, custom v4l2loopback installer, and FFmpeg-v4l2loopback connector from separate v2.x repositories into a single, modular system.
 - Phase-based architecture (bootstrap, main runtime, scene engine).
 - Enhanced installer with rollback, progress tracking, and interactive config.
 - Systemd service for robust deployment.
 - Camera auto-discovery (ARP/brute-force).
 - Advanced scene engine with JSON rules, supporting complex conditions and actions.
 #### Changed
-- Consolidated previous repositories (v2.x series) into a single, modular system.
-- Improved performance with asynchronous processing and optimized polling.
+- Replaced v2.x series’ fragmented codebase with a cohesive, Python-driven system, improving maintainability and performance.
+- Optimized asynchronous processing and polling for lower latency.
 #### Removed
 - SQLite database (unused, added complexity).
-- Separate bash orchestrator (now in Python).
+- Separate bash orchestrator (now integrated into Python).
 
 ### [2.5.0b] - 2025-08-21
 #### Added
@@ -260,8 +294,3 @@ Standardized format: Follows [Keep a Changelog](https://keepachangelog.com/en/1.
 - Initial release with scoreboard monitoring, OBS control, bracket parsing, network checks, pause functionality, camera switching, virtual environment, systemd integration, and bash orchestration.
 #### Known Issues
 - Issues with bracket file, team names, stability checks, logging verbosity, scene persistence, and dependency management.
-
-## License
-MIT License - See [LICENSE](LICENSE) for details.
-
-Contributions welcome! Fork, PR with PEP 8 code, update changelog.
