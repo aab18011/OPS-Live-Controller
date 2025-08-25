@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-ROC (Remote OBS Controller) Startup System - Phase 1 Bootstrap (Enhanced)
+ROC (Remote OBS Controller) Startup System - Phase 1 Bootstrap
 Author: Aidan A. Bradley
-Version: 1.0.1
+Version: 3.0.0b
 
 Enhanced version with:
 - Improved camera discovery using ARP tables
@@ -44,7 +44,7 @@ V4L2_CHECKSUMS = {
 # Default configuration with enhanced settings
 DEFAULT_CONFIG = {
     "meta": {
-        "version": "1.0.1",
+        "version": "3.0.0",
         "created": None,
         "modified": None,
         "description": "ROC Configuration - Enhanced Bootstrap"
