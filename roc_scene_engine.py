@@ -2,7 +2,7 @@
 """
 ROC Scene Logic Engine - Phase 3
 Author: Aidan A. Bradley
-Version: 1.0.1
+Version: 3.0.0b
 
 Advanced configuration-driven scene switching system with:
 - JSON-based rule definitions
