@@ -19,7 +19,6 @@ Key principles:
 - **Unified Architecture:** Combines previously separate repositories (scene switcher, v4l2loopback installer, FFmpeg connector) into one cohesive codebase.
 - **PEP 8 Compliance:** Ensures readable, maintainable code.
 - **Semantic Versioning:** Follows MAJOR.MINOR.PATCH (e.g., v3.0.0b for beta, v3.0.1a for alpha).
-- **Open-Source Ethos:** Licensed under MIT, with academic-level documentation to support users in education, research, or hobbyist contexts.
 
 ROC operates in two phases:
 1. **Bootstrap (Phase 1):** Initializes system, checks dependencies, discovers cameras, and configures settings.
