@@ -1,0 +1,28 @@
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                              DATA FLOW DIAGRAM                                  │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+INPUT SOURCES                 PROCESSING LAYER              OUTPUT DESTINATIONS
+┌─────────────┐              ┌─────────────────┐           ┌─────────────────┐
+│ IP Cameras  │              │                 │           │  OBS Studio     │
+│ (RTSP)      │──────────────▶  Camera        │           │  Scene          │
+│             │   FFmpeg     │  Manager        │           │  Switching      │
+└─────────────┘              │                 │           └─────────────────┘
+                             └─────────────────┘                   ▲
+┌─────────────┐                       │                            │
+│ Scoreboard  │              ┌─────────────────┐                   │
+│ Web APIs    │──────────────▶  Scene Engine  │───────────────────┘
+│ (JSON/HTML) │   Polling    │                 │    WebSocket
+└─────────────┘              │ • Rule Engine   │    Commands
+                             │ • Condition     │
+┌─────────────┐              │   Evaluation    │           ┌─────────────────┐
+│ Config      │              │ • Action        │           │ v4l2loopback    │
+│ Files       │──────────────▶   Execution    │           │ Virtual         │
+│ (.json)     │   Hot-reload │                 │           │ Devices         │
+└─────────────┘              └─────────────────┘           └─────────────────┘
+                                      ▲                            ▲
+                             ┌─────────────────┐                   │
+                             │ Metrics &       │                   │
+                             │ Logging         │───────────────────┘
+                             │ System          │    Camera Streams
+                             └─────────────────┘
