@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/bash
 # ROC (Remote OBS Controller) Installation Script
 # Author: Aidan A. Bradley
 # Version: 3.0.0b
@@ -31,6 +31,7 @@ ROC_LOG_DIR="/var/log/roc"
 INSTALL_LOG="$ROC_LOG_DIR/roc_install.log"
 SYSTEMD_SERVICE_DIR="/etc/systemd/system"
 TEMP_INSTALL_DIR="/tmp/roc-install-$$"
+INSTALLER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Installation state tracking
 INSTALL_STEP=0
@@ -66,7 +67,7 @@ success() { log "SUCCESS" "$@"; }
 warning() { log "WARNING" "$@"; }
 info() { log "INFO" "$@"; }
 step() { 
-    ((INSTALL_STEP++))
+    install_step=$((INSTALL_STEP + 1)) || true
     log "STEP" "$@"
 }
 progress() { log "PROGRESS" "$@"; }
@@ -446,7 +447,7 @@ install_v4l2loopback() {
     
     cat > /etc/modprobe.d/roc-v4l2loopback.conf << 'EOF'
 # ROC v4l2loopback configuration
-options v4l2loopback devices=16 video_nr=0-15 card_label=ROC_Camera exclusive_caps=1
+options v4l2loopback devices=16
 EOF
     
     cat > /etc/modules-load.d/roc-v4l2loopback.conf << 'EOF'
@@ -456,7 +457,7 @@ EOF
     
     # Load module
     progress "Loading v4l2loopback module..."
-    modprobe v4l2loopback devices=16 video_nr=0-15 card_label=ROC_Camera exclusive_caps=1
+    modprobe v4l2loopback devices=16
     
     # Verify installation
     if ! lsmod | grep -q v4l2loopback; then
@@ -477,12 +478,12 @@ EOF
 install_roc_files() {
     step "Installing ROC application files"
     
-    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    local script_dir="$INSTALLER_DIR" # Had to change to this because it was originally stuck in the /tmp/ dir we setup earlier
     
     # File mappings: source:destination:permissions (updated to match attached files)
     local files=(
-        "roc_bootstrap_enhanced.py:$ROC_HOME/bin/roc_bootstrap.py:755"
-        "roc_main_enhanced.py:$ROC_HOME/bin/roc_main.py:755"
+        "roc_bootstrap.py:$ROC_HOME/bin/roc_bootstrap.py:755"
+        "roc_main.py:$ROC_HOME/bin/roc_main.py:755"
         "roc_scene_engine.py:$ROC_HOME/bin/roc_scene_engine.py:755"
     )
     
