@@ -594,7 +594,8 @@ case "${1:-}" in
         fi
         
         # Video devices
-        local video_devices=$(ls /dev/video* 2>/dev/null | wc -l)
+        #local - this was removed from the line below because it was misused. Needs attention to ensure no security flaws.
+        video_devices=$(ls /dev/video* 2>/dev/null | wc -l)
         echo "📹 Video devices: $video_devices"
         
         # Log file sizes
